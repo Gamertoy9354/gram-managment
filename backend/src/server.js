@@ -71,11 +71,10 @@ app.use('/api/tax',          taxRouter);
 app.use('/api/templates',    templatesRouter);
 app.use('/api/config',       configRouter);
 
-// ─── Static Media Serving (for Twilio PDF delivery) ─────────────────────────
 const os = require('os');
-// On Render (free tier), use the OS temp dir since the filesystem is ephemeral.
-// On local/Railway use a persistent storage folder.
-const MEDIA_DIR = (process.env.NODE_ENV === 'production' || process.env.RENDER)
+// On Vercel, use the OS temp dir since it is a read-only serverless environment.
+// On Render/local/Railway, use the writable storage folder.
+const MEDIA_DIR = (process.env.VERCEL)
   ? os.tmpdir()
   : path.join(__dirname, '../storage/temp-media');
 if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
