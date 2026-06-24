@@ -13,7 +13,14 @@ const twilio = require('twilio');
 
 const TWILIO_ACCOUNT_SID   = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN    = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
+
+let rawFrom = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
+if (rawFrom && !rawFrom.startsWith('whatsapp:')) {
+  // Ensure plus sign is present
+  const plusSign = rawFrom.startsWith('+') ? '' : '+';
+  rawFrom = `whatsapp:${plusSign}${rawFrom}`;
+}
+const TWILIO_WHATSAPP_FROM = rawFrom;
 
 if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
   console.warn('[Twilio] ⚠️  TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN missing — messages will fail.');
