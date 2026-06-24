@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: gram-panchayat-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.11.1
+
+  - type: web
+    name: gram-panchayat-dashboard
+    env: node
+    rootDir: dashboard
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: gram-panchayat-backend
+          envVarKey: RENDER_EXTERNAL_URL

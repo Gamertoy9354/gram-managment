@@ -1,0 +1,43 @@
+{
+  "name": "gram-panchayat-bot-backend",
+  "version": "1.0.0",
+  "description": "Gram Panchayat WhatsApp Document Retrieval Bot - Backend",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon --ext js,json,env --watch src --watch .env src/server.js",
+    "test": "jest --coverage"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "gram-panchayat",
+    "twilio"
+  ],
+  "author": "INNOCREW",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "express-validator": "^7.2.0",
+    "fuse.js": "^7.0.0",
+    "googleapis": "^140.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4",
+    "razorpay": "^2.9.6",
+    "tesseract.js": "^7.0.0",
+    "twilio": "^5.3.7",
+    "uuid": "^10.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

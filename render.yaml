@@ -1,0 +1,86 @@
+services:
+  # ── Backend: WhatsApp Bot API ──────────────────────────────────────────────
+  - type: web
+    name: gp-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node src/server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: PORT
+        value: 3000
+      - key: USE_TWILIO
+        value: "true"
+      # The backend's own public URL (set automatically by Render)
+      - key: PUBLIC_URL
+        fromService:
+          type: web
+          name: gp-backend
+          envVarKey: RENDER_EXTERNAL_URL
+      # Dashboard's URL for CORS whitelist
+      - key: DASHBOARD_URL
+        fromService:
+          type: web
+          name: gp-dashboard
+          envVarKey: RENDER_EXTERNAL_URL
+      # ── Secrets (fill these in the Render dashboard) ──────────────────────
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_NUMBER
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_DRIVE_PRIVATE_KEY
+        sync: false
+      - key: GOOGLE_DRIVE_ROOT_FOLDER_ID
+        sync: false
+      - key: PAYEE_UPI_ID
+        sync: false
+      - key: PAYEE_NAME
+        sync: false
+
+  # ── Frontend: Next.js Dashboard ───────────────────────────────────────────
+  - type: web
+    name: gp-dashboard
+    env: node
+    plan: free
+    rootDir: dashboard
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: PORT
+        value: 3001
+      # Point dashboard at the live backend URL (auto-wired)
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: gp-backend
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
