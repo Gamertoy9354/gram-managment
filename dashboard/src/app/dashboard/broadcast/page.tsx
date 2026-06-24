@@ -1028,7 +1028,7 @@ export default function BroadcastPage() {
               
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                  Create and verify custom utility templates under Meta's guidelines.
+                  Create and verify custom utility templates under Meta&apos;s guidelines.
                 </span>
                 <button 
                   onClick={() => setShowTemplateModal(true)}
