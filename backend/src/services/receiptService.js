@@ -152,8 +152,8 @@ async function generateEReceipt(record, paymentId, panchayatName = 'Gram Panchay
     x: width - 162, y: height - 64,
     size: 16, font: fontBold, color: COLORS.white,
   });
-  page.drawText('PAID ✓', {
-    x: width - 147, y: height - 82,
+  page.drawText('PAID', {
+    x: width - 138, y: height - 82,
     size: 12, font: fontBold, color: COLORS.paidGreen,
   });
 
@@ -303,7 +303,7 @@ async function generateEReceipt(record, paymentId, panchayatName = 'Gram Panchay
     x: 17, y: 17, width: width - 34, height: 42,
     color: COLORS.headerBg,
   });
-  page.drawText('Powered by Flowlytix.in — Digital Gram Panchayat Management Platform', {
+  page.drawText('Powered by Flowlytix.in - Digital Gram Panchayat Management Platform', {
     x: 30, y: 37,
     size: 8, font: fontObl, color: rgb(0.7, 0.92, 0.82),
   });
