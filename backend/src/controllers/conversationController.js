@@ -13,7 +13,7 @@ const fs   = require('fs');
 const os   = require('os');
 const https = require('https');
 const QRCode = require('qrcode');
-const Tesseract = require('tesseract.js');
+const { performOCR, matchesPropertyId, verifyPayment, verifyPaymentDetails } = require('../utils/ocr');
 
 /**
  * Downloads a file from a URL, automatically following HTTP redirects.
@@ -65,59 +65,6 @@ function downloadFile(url, destPath) {
     
     get(url);
   });
-}
-
-/**
- * Helper to build a regex pattern for checking the exact payment amount in OCR text.
- * Handles both integers and decimal values.
- */
-function getAmountRegex(amount) {
-  const val = parseFloat(amount);
-  const hasDecimals = val % 1 !== 0;
-  if (hasDecimals) {
-    const exactStr = val.toFixed(2);
-    const shortStr = String(val);
-    const escapedExact = exactStr.replace(/\./g, '\\.');
-    const escapedShort = shortStr.replace(/\./g, '\\.');
-    return new RegExp(`(?:^|\\s|[^0-9])(?:rs\\.?|rupees?|inr|₹)?\\s*(${escapedExact}|${escapedShort})(?:[^0-9]|\\s|$)`, 'i');
-  } else {
-    const intStr = String(Math.floor(val));
-    return new RegExp(`(?:^|\\s|[^0-9])(?:rs\\.?|rupees?|inr|₹)?\\s*(${intStr}(?:\\.00)?)(?:[^0-9]|\\s|$)`, 'i');
-  }
-}
-
-/**
- * Verifies if the property ID exists in the OCR text as a distinct token/word.
- * This prevents false matches for short numeric IDs (e.g. "5" matching in phone numbers like "9537199300").
- * It remains robust for alphanumeric IDs by falling back to substring matching for lengths >= 4 or alphanumeric IDs.
- */
-function matchesPropertyId(ocrText, propertyId) {
-  if (!propertyId) return false;
-  
-  const cleanPropId = propertyId.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (!cleanPropId) return false;
-
-  // 1. Primary check: Look for "TXID=<propertyId>" pattern in the OCR text
-  const escaped = cleanPropId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-  const txidRegex = new RegExp(`txid[^a-zA-Z0-9]*${escaped}`, 'i');
-  if (txidRegex.test(ocrText)) {
-    return true;
-  }
-  
-  // 2. Fallback check: Check if cleanPropId matches as a distinct word in normalized OCR
-  const normalizedOcr = ocrText.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
-  const wordRegex = new RegExp(`(?:^|\\s)${cleanPropId}(?:$|\\s)`, 'i');
-  if (wordRegex.test(normalizedOcr)) {
-    return true;
-  }
-  
-  // 3. Fallback substring check (only if not a short numeric ID)
-  const cleanOcr = ocrText.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (cleanPropId.length >= 4 || !/^\d+$/.test(cleanPropId)) {
-    return cleanOcr.includes(cleanPropId);
-  }
-  
-  return false;
 }
 
 
@@ -339,8 +286,8 @@ async function handleMessage(from, body, msgSid, mediaUrl, mediaType) {
       await downloadFile(mediaUrl, screenshotPath);
       console.log(`[OCR Stateless] Downloaded receipt to ${screenshotPath}. Running OCR...`);
 
-      // Run OCR locally using Tesseract.js
-      const { data: { text } } = await Tesseract.recognize(screenshotPath, 'eng');
+      // Run OCR (GCP or Tesseract fallback) to extract raw text
+      const text = await performOCR(screenshotPath);
       console.log('[OCR Stateless] Extracted text:', text);
 
       // Normalize texts for comparison
@@ -386,18 +333,25 @@ async function handleMessage(from, body, msgSid, mediaUrl, mediaType) {
       }
 
       if (matchedRecord) {
-        // Run full verification checks
+        // Run full verification checks using Vision LLM (if key set), otherwise use local Tesseract logic
         const payeeUpi = config.payee_upi_id || process.env.PAYEE_UPI_ID || 'shismehta77@oksbi';
-        const cleanPayee = payeeUpi.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let verification;
 
-        const payeeMatch = cleanOcr.includes(cleanPayee);
-        const propIdMatch = matchesPropertyId(text, matchedRecord.property_id);
+        const nvidiaKey = process.env.NVIDIA_API_KEY;
+        const hasNvidia = nvidiaKey && !nvidiaKey.includes('YOUR_KEY') && nvidiaKey.trim() !== '';
 
-        const cleanOcrNumbers = text.replace(/,/g, '');
-        const amountRegex = getAmountRegex(matchedRecord.due_amount);
-        const amountMatch = amountRegex.test(cleanOcrNumbers);
+        if (hasNvidia) {
+          try {
+            verification = await verifyPayment(screenshotPath, payeeUpi, matchedRecord.property_id, matchedRecord.due_amount);
+          } catch (err) {
+            console.error('[OCR Stateless Fallback] NVIDIA Vision failed:', err.message);
+            verification = verifyPaymentDetails(text, payeeUpi, matchedRecord.property_id, matchedRecord.due_amount);
+          }
+        } else {
+          verification = verifyPaymentDetails(text, payeeUpi, matchedRecord.property_id, matchedRecord.due_amount);
+        }
 
-        if (payeeMatch && propIdMatch && amountMatch) {
+        if (verification.success) {
           console.log('[OCR Stateless] Receipt verification SUCCESS for property:', matchedRecord.property_id);
 
           const paymentId = `ocr_verified_${Date.now()}`;
@@ -786,25 +740,10 @@ async function handleMessage(from, body, msgSid, mediaUrl, mediaType) {
           await downloadFile(mediaUrl, screenshotPath);
           console.log(`[OCR] Downloaded receipt to ${screenshotPath}. Running OCR...`);
 
-          // Run OCR locally using Tesseract.js
-          const { data: { text } } = await Tesseract.recognize(screenshotPath, 'eng');
-          console.log('[OCR] Extracted text:', text);
-
-          // Normalize texts for comparison (strip non-alphanumeric, lowercase)
-          const cleanOcr = text.toLowerCase().replace(/[^a-z0-9]/g, '');
           const payeeUpi = config.payee_upi_id || process.env.PAYEE_UPI_ID || 'shismehta77@oksbi';
-          const cleanPayee = payeeUpi.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const verification = await verifyPayment(screenshotPath, payeeUpi, record.property_id, record.due_amount);
 
-          // Check if both payee UPI and Property ID exist in the receipt text
-          const payeeMatch = cleanOcr.includes(cleanPayee);
-          const propIdMatch = matchesPropertyId(text, record.property_id);
-
-          // Check if amount matches
-          const cleanOcrNumbers = text.replace(/,/g, '');
-          const amountRegex = getAmountRegex(record.due_amount);
-          const amountMatch = amountRegex.test(cleanOcrNumbers);
-
-          if (payeeMatch && propIdMatch && amountMatch) {
+          if (verification.success) {
             console.log('[OCR] Receipt verification SUCCESS!');
 
             const paymentId = `ocr_verified_${Date.now()}`;
